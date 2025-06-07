@@ -182,11 +182,11 @@ func WithIgnoreServerCertificateError(value bool) Option {
 	}
 }
 
-func WithOptimizeHeaders() Option {
-	return func(config *Config) {
-		config.OptimizeHeaders = true
-	}
-}
+//func WithOptimizeHeaders() Option {
+//	return func(config *Config) {
+//		config.OptimizeHeaders = true
+//	}
+//}
 
 func WithIdleNodesListUpdatePeriod(period time.Duration) Option {
 	return func(config *Config) {

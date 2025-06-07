@@ -30,10 +30,10 @@ var (
 	WithClientCertificate            = shared.WithClientCertificate
 	WithClientCertificateSource      = shared.WithClientCertificateSource
 	WithIgnoreServerCertificateError = shared.WithIgnoreServerCertificateError
-	WithOptimizeHeaders              = shared.WithOptimizeHeaders
-	WithKeyLogWriter                 = shared.WithKeyLogWriter
-	WithTLSSessionCache              = shared.WithTLSSessionCache
-	WithMaxIdleHTTPConnections       = shared.WithMaxIdleHTTPConnections
+	//WithOptimizeHeaders              = shared.WithOptimizeHeaders
+	WithKeyLogWriter           = shared.WithKeyLogWriter
+	WithTLSSessionCache        = shared.WithTLSSessionCache
+	WithMaxIdleHTTPConnections = shared.WithMaxIdleHTTPConnections
 )
 
 type Helper struct {
