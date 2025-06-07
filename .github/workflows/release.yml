@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v[0-9]+\.[0-9]+\.[0-9]+*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:
+    inputs:
+      target-tag:
+        required: true
+        type: string
+        description: Target tag to run on
 
 permissions:
   contents: write  # Required to create release
@@ -15,6 +21,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Checkout target tag
+        if: ${{ inputs.target-tag != '' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target-tag }}
 
 #      - name: Create GitHub Release
 #        run: |
