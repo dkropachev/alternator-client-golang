@@ -1,4 +1,4 @@
-module github.com/dkropachev/alternator-client-golang/v2
+module github.com/dkropachev/alternator-client-golang/sdkv2
 
 go 1.24.0
 

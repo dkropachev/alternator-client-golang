@@ -3,25 +3,26 @@ package shared
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net/http"
-	"os"
 )
 
+// DefaultHTTPTransport creates default `http.Transport`
 func DefaultHTTPTransport() *http.Transport {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.IdleConnTimeout = defaultIdleConnectionTimeout
 	return transport
 }
 
+// NewHTTPTransport creates new http transport based on `ALNConfig`
 func NewHTTPTransport(config ALNConfig) *http.Transport {
 	transport := DefaultHTTPTransport()
 	PatchBasicHTTPTransport(config, transport)
 	return transport
 }
 
+// PatchBasicHTTPTransport patches `http.Transport` based on provided `ALNConfig`
 func PatchBasicHTTPTransport(config ALNConfig, transport *http.Transport) {
-	transport.IdleConnTimeout = defaultIdleConnectionTimeout
+	transport.IdleConnTimeout = config.IdleHTTPConnectionTimeout
 	transport.MaxIdleConns = config.MaxIdleHTTPConnections
 
 	if transport.TLSClientConfig == nil {
@@ -34,7 +35,7 @@ func PatchBasicHTTPTransport(config ALNConfig, transport *http.Transport) {
 
 	if config.IgnoreServerCertificateError {
 		transport.TLSClientConfig.InsecureSkipVerify = true
-		transport.TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		transport.TLSClientConfig.VerifyPeerCertificate = func(_ [][]byte, _ [][]*x509.Certificate) error {
 			return nil
 		}
 	}
@@ -44,12 +45,6 @@ func PatchBasicHTTPTransport(config ALNConfig, transport *http.Transport) {
 	}
 
 	if config.ClientCertificateSource != nil {
-		transport.TLSClientConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			return config.ClientCertificateSource.GetCertificate()
-		}
+		transport.TLSClientConfig.GetClientCertificate = config.ClientCertificateSource.GetClientCertificate
 	}
-}
-
-func LogError(err error) {
-	_, _ = fmt.Fprintf(os.Stderr, "ERROR: %s", err.Error())
 }
