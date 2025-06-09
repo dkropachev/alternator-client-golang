@@ -28,17 +28,10 @@ jobs:
         with:
           ref: ${{ inputs.target-tag }}
 
-#      - name: Create GitHub Release
-#        run: |
-#          gh release create "$GITHUB_REF_NAME" \
-#            --generate-notes \
-#            --title "$GITHUB_REF_NAME"
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: googleapis/release-please-action@v4
-        with:
-          release-type: go
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-
+      - name: Create GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --title "$GITHUB_REF_NAME"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
