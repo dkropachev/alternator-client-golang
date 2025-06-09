@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.7
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.41.1
 	github.com/aws/smithy-go v1.22.3
-	github.com/dkropachev/alternator-client-golang/shared v0.0.0-00010101000000-000000000000
+	github.com/dkropachev/alternator-client-golang/shared v0.0.0-20250607211739-627953485187
 )
 
 require (
