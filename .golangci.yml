@@ -1,20 +1,17 @@
 version: 2
 
 issues:
-  new: true
-  new-from-rev: origin/master
-  exclude-dirs:
-    - semver
+#  new: false
+#  new-from-rev: origin/master
+#  exclude-dirs:
+#    - semver
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - gocritic
-    - gofumpt
     - goheader
-    - goimports
-    - gosimple
     - govet
     - ineffassign
     - misspell
@@ -23,9 +20,41 @@ linters:
     - staticcheck
     - thelper
     - tparallel
-    - typecheck
     - unused
     - forbidigo
+    - nolintlint
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+        - fieldalignment
+
+    nolintlint:
+      allow-no-explanation: [ golines ]
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  default: none
+  enable:
+    - gofumpt
+    - goimports
+    - golines
+
+  settings:
+    gofumpt:
+      extra-rules: true
+
+    goimports:
+      local-prefixes:
+        - github.com/dkropachev/alternator-client-golang
+        - github.com/dkropachev/alternator-client-golang/shared
+        - github.com/dkropachev/alternator-client-golang/sdkv1
+        - github.com/dkropachev/alternator-client-golang/sdkv2
+    golines:
+      max-len: 120
 
 run:
   deadline: 10m
@@ -34,18 +63,3 @@ run:
   build-tags:
     - integration
   go: 1.24.0
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - shadow
-      - fieldalignment
-
-  gofumpt:
-    extra-rules: true
-
-  revive:
-    rules:
-      - name: var-naming
-        disabled: true

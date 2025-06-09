@@ -8,7 +8,13 @@ import (
 	"time"
 )
 
-type CertSource struct {
+// CertSource an interface that provides http clients with certificate
+type CertSource interface {
+	GetClientCertificate(*tls.CertificateRequestInfo) (*tls.Certificate, error)
+}
+
+// CertFileSource serves certificate and key from a files
+type CertFileSource struct {
 	certPath string
 	keyPath  string
 	cert     *tls.Certificate
@@ -16,24 +22,16 @@ type CertSource struct {
 	modTime  time.Time
 }
 
-func NewFileCertificate(certPath, keyPath string) *CertSource {
-	return &CertSource{
+// NewFileCertificate creates new instance of `CertFileSource` to serve certificate and key from a file
+func NewFileCertificate(certPath, keyPath string) *CertFileSource {
+	return &CertFileSource{
 		certPath: certPath,
 		keyPath:  keyPath,
 	}
 }
 
-func NewCertificate(certificate tls.Certificate) *CertSource {
-	return &CertSource{
-		cert: &certificate,
-	}
-}
-
-func (c *CertSource) GetCertificate() (*tls.Certificate, error) {
-	if c.certPath == "" {
-		return c.cert, nil
-	}
-
+// GetClientCertificate implementation of tls.Config.GetClientCertificate that serves certificate from a file
+func (c *CertFileSource) GetClientCertificate(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -41,7 +39,7 @@ func (c *CertSource) GetCertificate() (*tls.Certificate, error) {
 	if err != nil {
 		err = fmt.Errorf("failed to stat certificate file %s: %w", c.certPath, err)
 		if c.cert != nil {
-			LogError(err)
+			fmt.Fprintf(os.Stderr, "ERROR: %s", err.Error())
 			return c.cert, nil
 		}
 		return nil, err
@@ -55,7 +53,7 @@ func (c *CertSource) GetCertificate() (*tls.Certificate, error) {
 	if err != nil {
 		err = fmt.Errorf("failed to load certificate file %s: %w", c.certPath, err)
 		if c.cert != nil {
-			LogError(err)
+			fmt.Fprintf(os.Stderr, "ERROR: %s", err.Error())
 			return c.cert, nil
 		}
 		return nil, err
@@ -63,5 +61,22 @@ func (c *CertSource) GetCertificate() (*tls.Certificate, error) {
 
 	c.cert = &cert
 	c.modTime = certStat.ModTime()
+	return c.cert, nil
+}
+
+// CertificateSource serves provided certificate to a http client
+type CertificateSource struct {
+	cert *tls.Certificate
+}
+
+// NewCertificate returns a new instance of `Certificate` that serves the certificate
+func NewCertificate(cert tls.Certificate) *CertificateSource {
+	return &CertificateSource{
+		cert: &cert,
+	}
+}
+
+// GetClientCertificate implementation of tls.Config.GetClientCertificate that serves provided certificate
+func (c *CertificateSource) GetClientCertificate(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 	return c.cert, nil
 }

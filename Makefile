@@ -48,21 +48,21 @@ COMPOSE := docker-compose -f $(MAKEFILE_PATH)/test/docker-compose.yml
 
 .PHONY: clean
 clean:
-	@echo "Cleaning v1"
-	@go clean -r ./...
-	@echo "Cleaning v2"
-	@cd v2; go clean -r ./...
+	$(MAKE) -C ./shared clean
+	$(MAKE) -C ./sdkv1 clean
+	$(MAKE) -C ./sdkv2 clean
 
 .PHONY: build
 build:
-	@echo "Building v1"
-	@go build ./...
-	@echo "Building v2"
-	@go build ./v2/...
+	$(MAKE) -C ./shared build
+	$(MAKE) -C ./sdkv1 build
+	$(MAKE) -C ./sdkv2 build
 
 .PHONY: clean-caches
 clean-caches:
-	@go clean -r -cache -testcache -modcache ./...
+	$(MAKE) -C ./shared clean-caches
+	$(MAKE) -C ./sdkv1 clean-caches
+	$(MAKE) -C ./sdkv2 clean-caches
 
 .PHONY: check
 check: check-golangci
@@ -72,44 +72,34 @@ fix: fix-golangci
 
 .PHONY: check-golangci
 check-golangci: .prepare-golangci
-	@echo "======== Lint code for shared"
-	@golangci-lint run ./shared/...
-	@echo "======== Lint code for v1"
-	@golangci-lint run ./...
-	@echo "======== Lint code for v2"
-	@golangci-lint run ./v2/...
+	$(MAKE) -C ./shared check-golangci
+	$(MAKE) -C ./sdkv1 check-golangci
+	$(MAKE) -C ./sdkv2 check-golangci
 
 .PHONY: fix-golangci
 fix-golangci: .prepare-golangci
-	@echo "======== Fix code for shared"
-	@golangci-lint run --fix ./shared/...
-	@echo "======== Fix code for v1"
-	@golangci-lint run --fix ./...
-	@echo "======== Fix code for v2"
-	@golangci-lint run  --fix ./v2/...
+	$(MAKE) -C ./shared fix-golangci
+	$(MAKE) -C ./sdkv1 fix-golangci
+	$(MAKE) -C ./sdkv2 fix-golangci
 
 .PHONY: test
 test: build check test-unit test-integration
 
 .PHONY: test-unit
 test-unit:
-	@echo "======== Running unit tests for shared"
-	@go test -v -cover -race ./shared/...
-	@echo "======== Running unit tests for v1"
-	@go test -v -cover -race ./...
-	@echo "======== Running unit tests for v2"
-	@go test -v -cover -race ./v2/...
+	$(MAKE) -C ./shared test-unit
+	$(MAKE) -C ./sdkv1 test-unit
+	$(MAKE) -C ./sdkv2 test-unit
 
 .PHONY: test-integration
 test-integration: scylla-start
-	@echo "======== Running unit tests for v1"
-	@go test -v -cover -race -tags integration ./...
-	@echo "======== Running unit tests for v2"
-	@go test -v -cover -race -tags integration ./v2/...
+	$(MAKE) -C ./shared test-integration
+	$(MAKE) -C ./sdkv1 test-integration
+	$(MAKE) -C ./sdkv2 test-integration
 
 .PHONY: .prepare-cert
 .prepare-cert:
-	@[ -f "test/scylla/db.key" ] || (echo "Prepare certificate" && cd test/scylla/ && openssl req -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com" -x509 -newkey rsa:4096 -keyout db.key -out db.crt -days 3650 -nodes && chmod 644 db.key)
+	@[ -f "${MAKEFILE_PATH}/test/scylla/db.key" ] || (echo "Prepare certificate" && cd ${MAKEFILE_PATH}/test/scylla/ && openssl req -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com" -x509 -newkey rsa:4096 -keyout db.key -out db.crt -days 3650 -nodes && chmod 644 db.key)
 
 .PHONY: scylla-start
 scylla-start: .prepare-cert $(GOBIN)/docker-compose

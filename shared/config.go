@@ -1,25 +1,35 @@
+// Package shared provides basic functionality for Alternator helpers
 package shared
 
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
 
+// Config a common configuration for Alternator helper
 type Config struct {
-	Port                    int
-	Scheme                  string
-	Rack                    string
-	Datacenter              string
-	AWSRegion               string
-	NodesListUpdatePeriod   time.Duration
-	AccessKeyID             string
-	SecretAccessKey         string
-	HTTPClient              *http.Client
-	ALNHTTPClient           *http.Client
-	ClientCertificateSource *CertSource
+	// Port a port for alternator nodes
+	Port int
+	// Scheme a scheme for alternator nodes: http or https
+	Scheme string
+	// Rack a rack of the Alternator nodes to target
+	Rack string
+	// Datacenter a rack of the Alternator nodes to target
+	Datacenter string
+	// AWSRegion a region that will be handed over to AWS SDK to forge requests
+	AWSRegion string
+	// AccessKeyID from AWS credentials
+	AccessKeyID string
+	// SecretAccessKey from AWS credentials
+	SecretAccessKey string
+	// NodesListUpdatePeriod how often read list of nodes, while requests are running
+	NodesListUpdatePeriod time.Duration
+	// ClientCertificateSource a certificate store to supplies client certificate to the http client
+	ClientCertificateSource CertSource
 	// Makes it ignore server certificate errors
 	IgnoreServerCertificateError bool
 	// OptimizeHeaders - when true removes unnecessary http headers reducing network footprint
@@ -32,8 +42,11 @@ type Config struct {
 	TLSSessionCache tls.ClientSessionCache
 	// Maximum number of idle HTTP connections
 	MaxIdleHTTPConnections int
+	// Time to keep idle http connection alive
+	IdleHTTPConnectionTimeout time.Duration
 }
 
+// Option a configuration option
 type Option func(config *Config)
 
 const (
@@ -44,7 +57,8 @@ const (
 
 var defaultTLSSessionCache = tls.NewLRUClientSessionCache(256)
 
-func NewConfig() *Config {
+// NewDefaultConfig creates default `Config`
+func NewDefaultConfig() *Config {
 	return &Config{
 		Port:                      defaultPort,
 		Scheme:                    defaultScheme,
@@ -53,17 +67,20 @@ func NewConfig() *Config {
 		IdleNodesListUpdatePeriod: 2 * time.Hour,
 		TLSSessionCache:           defaultTLSSessionCache,
 		MaxIdleHTTPConnections:    100,
+		IdleHTTPConnectionTimeout: defaultIdleConnectionTimeout,
 	}
 }
 
+// ToALNConfig converts `Config` to `ALNConfig`
 func (c *Config) ToALNConfig() ALNConfig {
-	cfg := NewALNConfig()
+	cfg := NewDefaultALNConfig()
 	for _, opt := range c.ToALNOptions() {
 		opt(&cfg)
 	}
 	return cfg
 }
 
+// ToALNOptions converts `Config` to `[]ALNOption`
 func (c *Config) ToALNOptions() []ALNOption {
 	out := []ALNOption{
 		WithALNPort(c.Port),
@@ -71,6 +88,7 @@ func (c *Config) ToALNOptions() []ALNOption {
 		WithALNUpdatePeriod(c.NodesListUpdatePeriod),
 		WithALNIgnoreServerCertificateError(c.IgnoreServerCertificateError),
 		WithALNMaxIdleHTTPConnections(c.MaxIdleHTTPConnections),
+		WithALNIdleHTTPConnectionTimeout(c.IdleHTTPConnectionTimeout),
 	}
 
 	if c.Rack != "" {
@@ -79,10 +97,6 @@ func (c *Config) ToALNOptions() []ALNOption {
 
 	if c.Datacenter != "" {
 		out = append(out, WithALNDatacenter(c.Datacenter))
-	}
-
-	if c.ALNHTTPClient != nil {
-		out = append(out, WithALNHTTPClient(c.HTTPClient))
 	}
 
 	if c.IdleNodesListUpdatePeriod != 0 {
@@ -103,42 +117,55 @@ func (c *Config) ToALNOptions() []ALNOption {
 	return out
 }
 
+// WithScheme changes schema (http/https) for both dynamodb and alternator requests
 func WithScheme(scheme string) Option {
-	return func(config *Config) {
-		config.Scheme = scheme
+	switch scheme {
+	case "http", "https":
+		return func(config *Config) {
+			config.Scheme = scheme
+		}
+	default:
+		panic(fmt.Sprintf("invalid scheme: %s, supported schemas: http, https", scheme))
 	}
 }
 
+// WithPort changes port for both dynamodb and alternator requests
 func WithPort(port int) Option {
 	return func(config *Config) {
 		config.Port = port
 	}
 }
 
+// WithRack makes DynamoDB client target only nodes from particular rack
 func WithRack(rack string) Option {
 	return func(config *Config) {
 		config.Rack = rack
 	}
 }
 
+// WithDatacenter makes DynamoDB client target only nodes from particular datacenter
 func WithDatacenter(dc string) Option {
 	return func(config *Config) {
 		config.Datacenter = dc
 	}
 }
 
+// WithAWSRegion inject region into DynamoDB client, this region does not play any role
+// One way you can use it - to have this region in the logs, CloudWatch.
 func WithAWSRegion(region string) Option {
 	return func(config *Config) {
 		config.AWSRegion = region
 	}
 }
 
+// WithNodesListUpdatePeriod configures how often update list of nodes, while requests are running
 func WithNodesListUpdatePeriod(period time.Duration) Option {
 	return func(config *Config) {
 		config.NodesListUpdatePeriod = period
 	}
 }
 
+// WithCredentials provides credentials to DynamoDB client, which could be used by Alternator as well
 func WithCredentials(accessKeyID, secretAccessKey string) Option {
 	return func(config *Config) {
 		config.AccessKeyID = accessKeyID
@@ -146,72 +173,85 @@ func WithCredentials(accessKeyID, secretAccessKey string) Option {
 	}
 }
 
-func WithHTTPClient(httpClient *http.Client) Option {
-	return func(config *Config) {
-		config.HTTPClient = httpClient
-	}
-}
-
-func WithLocalNodesReaderHTTPClient(httpClient *http.Client) Option {
-	return func(config *Config) {
-		config.ALNHTTPClient = httpClient
-	}
-}
-
+// WithClientCertificateFile provides client certificates http clients for both DynamoDB and Alternator requests
+// from files
 func WithClientCertificateFile(certFile, keyFile string) Option {
 	return func(config *Config) {
 		config.ClientCertificateSource = NewFileCertificate(certFile, keyFile)
 	}
 }
 
+// WithClientCertificate provides client certificates http clients for both DynamoDB and Alternator requests
+// in a form of `tls.Certificate`
 func WithClientCertificate(certificate tls.Certificate) Option {
 	return func(config *Config) {
 		config.ClientCertificateSource = NewCertificate(certificate)
 	}
 }
 
-func WithClientCertificateSource(source *CertSource) Option {
+// WithClientCertificateSource provides client certificates http clients for both DynamoDB and Alternator requests
+// in a form of custom implementation of `CertSource` interface
+func WithClientCertificateSource(source CertSource) Option {
 	return func(config *Config) {
 		config.ClientCertificateSource = source
 	}
 }
 
+// WithIgnoreServerCertificateError makes both http clients ignore tls error when value is true
 func WithIgnoreServerCertificateError(value bool) Option {
 	return func(config *Config) {
 		config.IgnoreServerCertificateError = value
 	}
 }
 
-//func WithOptimizeHeaders() Option {
-//	return func(config *Config) {
-//		config.OptimizeHeaders = true
-//	}
-//}
+// WithOptimizeHeaders makes DynamoDB client remove headers not used by Alternator reducing outgoing traffic
+func WithOptimizeHeaders(value bool) Option {
+	return func(config *Config) {
+		config.OptimizeHeaders = value
+	}
+}
 
+// WithIdleNodesListUpdatePeriod configures how often update list of nodes, while no requests are running
 func WithIdleNodesListUpdatePeriod(period time.Duration) Option {
 	return func(config *Config) {
 		config.IdleNodesListUpdatePeriod = period
 	}
 }
 
+// WithKeyLogWriter makes both (DynamoDB and Alternator) clients to write TLS master key into a file
+// It helps to debug issues by looking at decoded HTTPS traffic between Alternator and client
 func WithKeyLogWriter(writer io.Writer) Option {
 	return func(config *Config) {
 		config.KeyLogWriter = writer
 	}
 }
 
+// WithTLSSessionCache overrides default TLS session cache
+// You can use it to either provide custom TlS cache implementation or to increase/decrease it's size
 func WithTLSSessionCache(cache tls.ClientSessionCache) Option {
 	return func(config *Config) {
 		config.TLSSessionCache = cache
 	}
 }
 
+// WithMaxIdleHTTPConnections controls maximum number of http connections held by http.Transport
+// Both clients configured to keep http connections to reuse them for next calls, which reduces traffic,
+//
+//	increases http and server efficiency and reduces latency
 func WithMaxIdleHTTPConnections(value int) Option {
 	return func(config *Config) {
 		config.MaxIdleHTTPConnections = value
 	}
 }
 
+// WithIdleHTTPConnectionTimeout controls timeout for idle http connections held by http.Transport
+func WithIdleHTTPConnectionTimeout(value time.Duration) Option {
+	return func(config *Config) {
+		config.IdleHTTPConnectionTimeout = value
+	}
+}
+
+// PatchHTTPClient takes `http.Client` instance and patches it according to `Config`
 func PatchHTTPClient(config Config, client interface{}) error {
 	httpClient, ok := client.(*http.Client)
 	if !ok {
